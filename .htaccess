@@ -1,0 +1,7 @@
+RewriteEngine On
+
+RewriteBase /hm
+
+# redirect all URLs that doesn't exist (e.g. files like jpg, css, but also php, etc.) to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php?url=$1 [L]
