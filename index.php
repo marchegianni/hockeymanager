@@ -37,6 +37,7 @@ ini_set("display_errors", 1);
  * modules (and their classes), general classes and libs folders
  */
 define("DEFAULT_PATH_CORE","./core");
+define("DEFAULT_PATH_CONFIG","./config");
 //define("DEFAULT_PATH_MODULES","./modules");
 define("DEFAULT_PATH_CLASSES","./classes");
 define("DEFAULT_PATH_LIBS","./libs");
@@ -79,7 +80,7 @@ header('content-type: text/html; charset=utf-8');
  *                                of the selected class will be executed
  */
 
-CWR()->getController()->show();
+HM()->getController()->show();
 
 
 ?>

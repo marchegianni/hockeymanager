@@ -16,7 +16,7 @@
  *      
  *      CORE MODULES (their classes are situated in the ./core/{core_module_name}/ folder)
  *      - try to load in constructor of core.class.php (this file) - via loadModules() method, 
- *        if core class not included, cowrieAutoload() function is called (which is in the autoload stack),
+ *        if core class not included, hmAutoload() function is called (which is in the autoload stack),
  *        which tries to load(include) when undefined class is called.
  *      
  *      MODULES (their classes are situated in the ./modules/{module_name}/ folder)
@@ -30,7 +30,7 @@
  *        (details in reading from URL params - core.class.php/getController() method) 
  *      
  *      GENERAL CLASSES (models, like routers, cards, interfaces etc., situated in ./classes/ folder)
- *      - included by cowrieAutoload() function (which is in the autoload stack),
+ *      - included by hmAutoload() function (which is in the autoload stack),
  *        which tries to load(include) when undefined class is called.
  *      - instance of general class is NOT created automaticaly. developer needs to define it where it is needed!
  * 
@@ -67,7 +67,7 @@ final class core {
         /* 
          * IMPORTANT:
          * ---------- 
-         * don't call here any method in which CWR()->... is called,
+         * don't call here any method in which HM()->... is called,
          * because by calling CWR the core constructor is also called 
          * and infinite loop of recursion is started
          */
@@ -82,7 +82,7 @@ final class core {
         $this->loadModules(DEFAULT_PATH_CORE, array('core', 'controller'));
         
         // include config
-        //require_once(DEFAULT_PATH_CORE."/../config/config.inc.php");
+        require_once(DEFAULT_PATH_CONFIG."/config.inc.php");
         
         // parse URL
         $this->routing->parseUrl();
@@ -99,19 +99,19 @@ final class core {
         return $this->{$module};
     }
     
-    private function isModuleLoaded($module_name){
+    private function isModuleLoaded($module_name) {
         return isset($this->$module_name);
     }
     
     /*
      * Load modules
-     * Not core modules, because this method is used just in '__get()', 'getController()' and 'cowrieAutoload()' methods,
+     * Not core modules, because this method is used just in '__get()', 'getController()' and 'hmAutoload()' methods,
      * which are used just for dealing with modules in ./modules/ and ./classes/ folders (not core modules).
      */
-    public function loadModule($module){
+    public function loadModule($module) {
         // if subclass (class that is not stored in the folder named NOT the same as the class),
         // we use this for classes like full_pe... etc. that are stored in modules/routersIGN/
-        if (strlen($this->url->module_folder) > 0 && 
+        /*if (strlen($this->url->module_folder) > 0 && 
             is_file(DEFAULT_PATH_MODULES."/{$this->url->module_folder}/{$module}.class.php")) {
             require_once(DEFAULT_PATH_MODULES."/".$this->url->module_folder."/".$module.".class.php");
         
@@ -121,23 +121,25 @@ final class core {
             require_once(DEFAULT_PATH_MODULES."/{$this->url->module_folder}/../{$module}.class.php");
         
         // otherwise it is assumed that the class is stored in the folder with the same name as class' name
-        } else {
-            // this is just for elseif case
-            $module_location = $this->searchClass($module);
+        } else {*/
+        // this is just for elseif case
+        $module_location = $this->searchClass($module);
 
-            if (is_file(DEFAULT_PATH_MODULES."/{$module}/{$module}.class.php")) {
-                require_once(DEFAULT_PATH_MODULES."/{$module}/{$module}.class.php");
-            
-            // really last chance to find module in all possible locations, where modules are stored
-            } elseif (is_file($module_location."/{$module}.class.php")) {
-                require_once($module_location."/{$module}.class.php");
-                
-            // if module not found, then show ERROR message
-            } else {
-                CWR()->home->setMessage(ERR_MODULE_NOT_RECOGNIZED.$module.".");
-                header("Location: ".DEFAULT_URL_ROOT);
-            }
+        if (is_file(DEFAULT_PATH_CLASSES."/{$module}/{$module}.class.php")) {
+            require_once(DEFAULT_PATH_CLASSES."/{$module}/{$module}.class.php");
+        
+        // really last chance to find module in all possible locations, where modules are stored
         }
+        elseif (is_file($module_location."/{$module}.class.php")) {
+            require_once($module_location."/{$module}.class.php");
+            
+        // if module not found, then show ERROR message
+        }
+        else {
+            HM()->home->setMessage(ERR_MODULE_NOT_RECOGNIZED.$module.".");
+            header("Location: ".DEFAULT_URL_ROOT);
+        }
+        //}
                 
         $this->loaded_modules[$module] = 1;
         $this->{$module} = new $module();
@@ -145,7 +147,7 @@ final class core {
 
 
     // search for wanted class in all possible locations (not module, because module needs to have a directory, but class doesn't have to have a directory)
-    public function searchClass($class, $locations=array(DEFAULT_PATH_MODULES, DEFAULT_PATH_CORE, DEFAULT_PATH_CLASSES)) {
+    public function searchClass($class, $locations=array(/*DEFAULT_PATH_MODULES, */DEFAULT_PATH_CORE, DEFAULT_PATH_CLASSES)) {
         foreach ($locations as $loc) {
             if (file_exists($loc."/".$class.".class.php")) {
                 return $loc;
@@ -189,10 +191,10 @@ final class core {
                 substr($module, 0, 1) != "_" &&         // not disabled (by '_' character before directory module name)
                 is_dir($dir_path.'/'.$module) &&        // class has folder
                 !in_array($module, $exceptions) &&      // not excluded in exceptions
-                class_exists($module))                  // class has to exist (if not, cowrieAutoload is called by default - see description of the class_exists() function)
+                class_exists($module))                  // class has to exist (if not, hmAutoload is called by default - see description of the class_exists() function)
             {
                 $this->loaded_modules[$module] = 1;
-                // class is included automaticaly by cowrieAutoload autoload function
+                // class is included automaticaly by hmAutoload autoload function
                 $this->{$module} = new $module();
             }
         }
@@ -219,125 +221,10 @@ final class core {
             return $this->controller;
         }
         
-        // read from URL - the params were parsed in url class called in constructor of this core class 
-        if (!empty($this->routing->url)) {
-        
-            ## 1st param? ##############
-            $this->routing->class = $this->routing->url[0];
-            
-            ## 2nd param? ##############
-            if (count($this->url->url) > 1) {
-                
-                // if 2nd URL param is directory in modules, then use it as folder (and maybe also as class)
-                if (is_dir(DEFAULT_PATH_MODULES."/".$this->url->section_ID."/".$this->url->url[1])) {
-
-                    $this->url->module_folder = $this->url->section_ID."/".$this->url->url[1];
-                    $this->url->class_ID = $this->url->url[1];
-
-                    ## 3rd param? ##############
-                    if (count($this->url->url) > 2) {
-
-                        // if 3rd URL param is directory in modules, then use it as folder (and maybe also as class)
-                        if (is_dir(DEFAULT_PATH_MODULES."/".$this->url->module_folder."/".$this->url->url[2])) {
-    
-                            $this->url->module_folder = $this->url->module_folder."/".$this->url->url[2];
-                            $this->url->class_ID = $this->url->url[2];
-    
-                            ## 4th param? ##############
-                            if (count($this->url->url) > 3) {
-                                
-                                // if 4th param is class in {2nd param} directory then use this class, and not from the 2nd param
-                                if (is_file(DEFAULT_PATH_MODULES."/".$this->url->module_folder."/".$this->url->url[3].".class.php")) {
-                                    $this->url->class_ID = $this->url->url[3];
-                                    
-                                    ## 5th param? ##############
-                                    if (count($this->url->url) > 4) {
-                                        
-                                        // if 5th URL param is method in class set by 4th URL param 
-                                        if (method_exists($this->{$this->url->class_ID}, $this->url->url[4])) {
-                                            $this->url->method_ID = $this->url->url[4];
-        
-                                            // even more params? then they are oather url params used in chosen method/class
-                                            if (count($this->url->url) > 5) {
-                                                $this->url->other_url_params = array_slice($this->url->url, 5);
-                                            }
-                                        
-                                        // if 5th URL param is not method, then it is some passed URL param
-                                        } else {
-                                            $this->url->other_url_params = array_slice($this->url->url, 4);
-                                        }
-                                        
-                                    } ## end of 5th param? ##############
-                                    
-                                    
-                                // if 4th URL param is method of class from 2nd URL param 
-                                } elseif (method_exists($this->{$this->url->class_ID}, $this->url->url[3])) {
-                                    $this->url->method_ID = $this->url->url[3];
-        
-                                    // even more params? then they are other url params used in chosen method/class
-                                    if (isset($this->url->url[4])) {
-                                        $this->url->other_url_params = array_slice($this->url->url, 4);
-                                    }
-                                    
-                                
-                                // these other URL params (may be more than 1) listed after class and method names 
-                                // are some other passed URL parameters 
-                                } else {
-                                    $this->url->other_url_params = array_slice($this->url->url, 3);
-                                }
-                                
-                            } ## end of 4th param? ##############
-                        
-                        // if 3rd URL param is method of class from 2nd URL param 
-                        } elseif (method_exists($this->{$this->url->class_ID}, $this->url->url[2])) {
-                            $this->url->method_ID = $this->url->url[2];
-
-                            // even more params? then they are other url params used in chosen method/class
-                            if (isset($this->url->url[3])) {
-                                $this->url->other_url_params = array_slice($this->url->url, 3);
-                            }
-                            
-                        
-                        // these other URL params (may be more than 1) listed after class and method names 
-                        // are some other passed URL parameters 
-                        } else {
-                            $this->url->other_url_params = array_slice($this->url->url, 2);
-                        }
-
-                    } ## end of 3rd param? ##############
-                    
-                }
-
-                // if 2nd URL param is NOT directory, then use it as method of class from 1st URL param
-                // if this method doesn't exist then default method of class in 1st URL param is used
-                elseif (method_exists($this->{$this->url->class_ID}, $this->url->url[1])) {
-                    $this->url->method_ID = $this->url->url[1];
-
-                    // if method is set, then all other URL params (if set) are some passed params
-                    if (isset($this->url->url[2])) {
-                        $this->url->other_url_params = array_slice($this->url->url, 2);
-                    }
-                
-                // if 2nd URL param is not directory in modules, nor it's method, then its some passed parameter 
-                } else {
-                    $this->url->other_url_params = array_slice($this->url->url, 1);
-                }
-                
-                
-            } ## end of 2nd param? ##############
-            
-            //$this->url->showUrlDebug();
-                        
-        }
-
-        
-        if (strlen($this->url->class_ID) == 0) {
-            //$controller_name = DEFAULT_CONTROLLER_NAME; # commented by J. Rybar (01/07/2016), reason: introducing sci application and server settings (htaccess redirects) required this
-            //redirect to default controller
-            header("Location: ".DEFAULT_URL_ROOT.DEFAULT_CONTROLLER_NAME);
-            exit();
+        if (strlen($this->url->class) == 0) {
+            $controller_name = DEFAULT_CONTROLLER_NAME;
         } else {
-            $controller_name = $this->url->class_ID;
+            $controller_name = $this->routing->class;
         }
         
         if ($this->isModuleLoaded($controller_name)) {
@@ -350,7 +237,7 @@ final class core {
 
 }
 
-function cwrAutoload_getSpecificSubfolders4generalClass() {
+function hmAutoload_getSpecificSubfolders4generalClass() {
     $specific_dirs = scandir(DEFAULT_PATH_CLASSES);
     foreach ($specific_dirs as $dkey => $d) {
         if (in_array($d, array(".", "..")) || !is_dir(DEFAULT_PATH_CLASSES."/".$d)) {
@@ -364,26 +251,27 @@ function cwrAutoload_getSpecificSubfolders4generalClass() {
 /*
  * if !class_exists($class) then try to load it from various locations: ./core/{core_class_name}/ or ./classes/, or others...
  */
-function cowrieAutoload($class) {
+function hmAutoload($class) {
     
     // if some class is missing, try to load it from ./core/{class_name}/
     if (is_file(DEFAULT_PATH_CORE."/".$class."/".$class.".class.php") ) {
         require_once(DEFAULT_PATH_CORE."/".$class."/".$class.".class.php");
     // if some class is missing, try to load it from ./classes
-    } elseif (is_file(DEFAULT_PATH_CORE."/../classes/".$class.".class.php") ) {
+    }
+    /*elseif (is_file(DEFAULT_PATH_CLASSES."/".$class.".class.php") ) {
         
         // if it's here, than it might also be in some of the subfolders, so let's find out if the specific subfolder for this module exists
         $specific_subfolder_path = "";
-        $specific_subfolders = cwrAutoload_getSpecificSubfolders4generalClass();
+        $specific_subfolders = hmAutoload_getSpecificSubfolders4generalClass();
         // if the specific subfolder for this module (from url) exists and the needed class is there, then use it, instead of the global one in the /classes/ root folder
-        if (!empty(CWR()->url->class_ID) && in_array(CWR()->url->class_ID, $specific_subfolders) && file_exists(DEFAULT_PATH_CORE."/../classes/".CWR()->url->class_ID."/".$class.".class.php")) {
-            $specific_subfolder_path = "/".CWR()->url->class_ID;
+        if (!empty(HM()->url->class_ID) && in_array(HM()->url->class_ID, $specific_subfolders) && file_exists(DEFAULT_PATH_CORE."/../classes/".HM()->url->class_ID."/".$class.".class.php")) {
+            $specific_subfolder_path = "/".HM()->url->class_ID;
         }
         
         require_once(DEFAULT_PATH_CORE."/../classes".$specific_subfolder_path."/".$class.".class.php");
     // if some class is missing, try to load it from ./modules/{class_name}/{class_name}.class.php
-    } elseif (is_file(DEFAULT_PATH_MODULES."/".$class."/".$class.".class.php") ) {
-        require_once(DEFAULT_PATH_MODULES."/".$class."/".$class.".class.php");
+    }*/ elseif (is_file(DEFAULT_PATH_CLASSES."/".$class."/".$class.".class.php") ) {
+        require_once(DEFAULT_PATH_CLASSES."/".$class."/".$class.".class.php");
     
     // try locations set in get_include_path()
     } elseif (extAutoload($class)) {
@@ -395,7 +283,7 @@ function cowrieAutoload($class) {
     // because there are conditions how to load modules in folder with name that is different 
     // than the class name (full_..., part_...)
     } else {
-        CWR()->loadModule($class);
+        HM()->loadModule($class);
     }
     
 }
@@ -408,7 +296,7 @@ function setAutoloadPath($path) {
 }
 
 /*
- *  if class not found in Cowrie folders/modules (logic in cowrieAutoload), then try locations from get_include_path(), where might be some paths for external libraries
+ *  if class not found in Cowrie folders/modules (logic in hmAutoload), then try locations from get_include_path(), where might be some paths for external libraries
  */
 function extAutoload($class) {
     $return = false;
@@ -438,7 +326,7 @@ function extAutoload($class) {
     
 }
 // define autoload function into autoload stack
-spl_autoload_register('cowrieAutoload');
+spl_autoload_register('hmAutoload');
 
 
 /*
@@ -450,7 +338,7 @@ function HM() {
 
 
 // quick debug function
-function debugMe($die=false) {
+/*function debugMe($die=false) {
     //var_dump(debug_backtrace());
     echo "<table>";
     foreach (debug_backtrace() as $dkey => $d) {
@@ -483,7 +371,7 @@ function debugMe($die=false) {
     if ($die) {
         die();
     }
-}
+}*/
 
 
 

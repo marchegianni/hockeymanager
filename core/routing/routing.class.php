@@ -40,15 +40,35 @@ class routing {
         
         if (!isset($raw_url) || empty($raw_url)) $raw_url = @$_REQUEST['url'];
         
-        // parse url params
+        // parse URL params
         $this->url = explode('/', $raw_url);
-        if (count($this->url) > 0 && strlen($this->url[0]) > 0) {
+        /*if (count($this->url) > 0 && strlen($this->url[0]) > 0) {
             // unset empty params
             foreach ($this->url as $key => $value) {
-                if (empty($value) && $value != 0) {
+                if (empty($value) && $value != 0) {//if ($value != "") {
                     unset($this->url[$key]);
                 }
             }
+        }*/
+        
+        if (!empty($this->url)) {
+            
+            for ($i = 0; $i < count($this->url); $i++) {
+                switch ($i) {
+                    case 0:
+                        $this->class = $this->url[$i];
+                        break;
+                    case 1:
+                        $this->method = $this->url[$i];
+                        break;
+                    default:
+                        $this->params[$i-2] = $this->url[$i];
+                        break;
+                }
+            }
+            
+            //$this->showUrlDebug();
+                        
         }
     }
     
